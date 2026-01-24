@@ -1,0 +1,25 @@
+{
+  "name": "tablight",
+  "version": "0.0.0",
+  "description": "It's a tab searcher for chrome tabs: like a spotlight for chrome",
+  "main": "index.js",
+  "scripts": {
+    "test": "mocha"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rish-0-0/tablight.git"
+  },
+  "keywords": [
+    "chrome",
+    "extension",
+    "search",
+    "tabs"
+  ],
+  "author": "Rishabh Anand",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/rish-0-0/tablight/issues"
+  },
+  "homepage": "https://github.com/rish-0-0/tablight#readme"
+}
