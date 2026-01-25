@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>TabLight Icon Generator</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 40px;
+      background: #1a1a1a;
+      color: white;
+      max-width: 800px;
+      margin: 0 auto;
+    }
+    h1 { margin-bottom: 10px; }
+    .subtitle { color: #888; margin-bottom: 30px; }
+    canvas {
+      border: 1px solid #333;
+      margin: 10px;
+      background: repeating-conic-gradient(#333 0% 25%, #222 0% 50%) 50% / 10px 10px;
+      border-radius: 8px;
+    }
+    .icon-row {
+      display: flex;
+      align-items: flex-end;
+      gap: 30px;
+      margin: 30px 0;
+      flex-wrap: wrap;
+    }
+    .icon-item { text-align: center; }
+    .icon-item h3 { margin: 10px 0 5px; color: #aaa; font-weight: 500; }
+    button {
+      background: #6366F1;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 16px;
+      margin-top: 20px;
+    }
+    button:hover { background: #5558E3; }
+    .instructions {
+      background: #252525;
+      padding: 20px;
+      border-radius: 12px;
+      margin-top: 30px;
+    }
+    .instructions h3 { margin-top: 0; color: #6366F1; }
+    .instructions ol { padding-left: 20px; line-height: 1.8; }
+    code { background: #333; padding: 2px 6px; border-radius: 4px; }
+  </style>
+</head>
+<body>
+  <h1>TabLight Icon Generator</h1>
+  <p class="subtitle">Generate beautiful icons for your Chrome extension</p>
+
+  <div class="icon-row">
+    <div class="icon-item">
+      <canvas id="icon16" width="16" height="16"></canvas>
+      <h3>16x16</h3>
+    </div>
+    <div class="icon-item">
+      <canvas id="icon32" width="32" height="32"></canvas>
+      <h3>32x32</h3>
+    </div>
+    <div class="icon-item">
+      <canvas id="icon48" width="48" height="48"></canvas>
+      <h3>48x48</h3>
+    </div>
+    <div class="icon-item">
+      <canvas id="icon128" width="128" height="128"></canvas>
+      <h3>128x128</h3>
+    </div>
+  </div>
+
+  <button onclick="downloadAll()">Download All Icons</button>
+
+  <div class="instructions">
+    <h3>Instructions</h3>
+    <ol>
+      <li>Click "Download All Icons" to save all icon sizes</li>
+      <li>Move the downloaded files to the <code>icons/</code> folder</li>
+      <li>Reload the extension in Chrome</li>
+    </ol>
+  </div>
+
+  <script>
+    function drawIcon(canvas) {
+      const ctx = canvas.getContext('2d');
+      const size = canvas.width;
+
+      ctx.clearRect(0, 0, size, size);
+
+      // Create gradient
+      const gradient = ctx.createLinearGradient(0, 0, size, size);
+      gradient.addColorStop(0, '#6366F1');
+      gradient.addColorStop(1, '#8B5CF6');
+
+      // Draw rounded square background
+      const padding = size * 0.06;
+      const radius = size * 0.2;
+
+      ctx.beginPath();
+      ctx.roundRect(padding, padding, size - padding * 2, size - padding * 2, radius);
+      ctx.fillStyle = gradient;
+      ctx.fill();
+
+      // Draw magnifying glass
+      ctx.strokeStyle = 'white';
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      const cx = size * 0.4;
+      const cy = size * 0.4;
+      const glassRadius = size * 0.18;
+
+      // Glass circle
+      ctx.lineWidth = Math.max(1, size * 0.06);
+      ctx.beginPath();
+      ctx.arc(cx, cy, glassRadius, 0, Math.PI * 2);
+      ctx.stroke();
+
+      // Handle
+      const handleStartX = cx + glassRadius * 0.7;
+      const handleStartY = cy + glassRadius * 0.7;
+      const handleEndX = handleStartX + size * 0.18;
+      const handleEndY = handleStartY + size * 0.18;
+
+      ctx.lineWidth = Math.max(1, size * 0.08);
+      ctx.beginPath();
+      ctx.moveTo(handleStartX, handleStartY);
+      ctx.lineTo(handleEndX, handleEndY);
+      ctx.stroke();
+
+      // Sparkle/light effect
+      ctx.lineWidth = Math.max(1, size * 0.04);
+      const sparkleX = size * 0.72;
+      const sparkleY = size * 0.28;
+      const sparkleSize = size * 0.08;
+
+      ctx.beginPath();
+      ctx.moveTo(sparkleX - sparkleSize, sparkleY);
+      ctx.lineTo(sparkleX + sparkleSize, sparkleY);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(sparkleX, sparkleY - sparkleSize);
+      ctx.lineTo(sparkleX, sparkleY + sparkleSize);
+      ctx.stroke();
+    }
+
+    function downloadCanvas(canvas, filename) {
+      const link = document.createElement('a');
+      link.download = filename;
+      link.href = canvas.toDataURL('image/png');
+      link.click();
+    }
+
+    function downloadAll() {
+      const sizes = [16, 48, 128];
+      sizes.forEach((size, i) => {
+        setTimeout(() => {
+          const canvas = document.getElementById('icon' + size);
+          downloadCanvas(canvas, `icon${size}.png`);
+        }, i * 200);
+      });
+    }
+
+    // Draw all icons
+    ['icon16', 'icon32', 'icon48', 'icon128'].forEach(id => {
+      drawIcon(document.getElementById(id));
+    });
+  </script>
+</body>
+</html>
