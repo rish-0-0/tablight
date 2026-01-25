@@ -14,13 +14,11 @@ let tabActivityOrder = [];
 
 // Initialize on startup
 chrome.runtime.onStartup.addListener(async () => {
-  console.log('TabLight: Browser started, initializing...');
   await initialize();
 });
 
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
-  console.log('TabLight: Extension installed/updated, initializing...');
   await initialize();
 });
 
@@ -41,9 +39,8 @@ async function initialize() {
       await indexTab(tab);
     }
 
-    console.log(`TabLight: Indexed ${tabs.length} tabs`);
-  } catch (error) {
-    console.error('TabLight: Initialization error', error);
+  } catch {
+    // Initialization error, will retry on next event
   }
 }
 
@@ -66,13 +63,27 @@ async function indexTab(tab) {
   });
 }
 
+// Check if a tab can receive messages (has content script)
+function canMessageTab(tab) {
+  if (!tab || !tab.url) return false;
+  const url = tab.url;
+  // Can't message chrome://, chrome-extension://, about:, or file:// pages
+  return !url.startsWith('chrome://') &&
+         !url.startsWith('chrome-extension://') &&
+         !url.startsWith('about:') &&
+         !url.startsWith('file://') &&
+         !url.startsWith('edge://') &&
+         !url.startsWith('brave://');
+}
+
 // Request meta tags from content script
 async function requestMetaTags(tabId) {
   try {
-    const response = await chrome.tabs.sendMessage(tabId, { action: 'get-meta-tags' });
+    const tab = await chrome.tabs.get(tabId);
+    if (!canMessageTab(tab)) return;
+
+    const response = await chrome.tabs.sendMessage(tabId, { action: 'get-meta-tags' }).catch(() => null);
     if (response && response.meta) {
-      // Update the tab with meta information
-      const tab = await chrome.tabs.get(tabId);
       await upsertTab({
         id: tab.id,
         windowId: tab.windowId,
@@ -84,8 +95,8 @@ async function requestMetaTags(tabId) {
         lastAccessed: Date.now()
       });
     }
-  } catch (error) {
-    // Content script might not be loaded yet, ignore
+  } catch {
+    // Tab might not exist or content script not loaded, ignore silently
   }
 }
 
@@ -133,9 +144,15 @@ chrome.tabs.onRemoved.addListener(async (tabId) => {
 // Handle keyboard command
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === 'toggle-tablight') {
-    const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (activeTab) {
-      chrome.tabs.sendMessage(activeTab.id, { action: 'toggle-overlay' });
+    try {
+      const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (activeTab && canMessageTab(activeTab)) {
+        await chrome.tabs.sendMessage(activeTab.id, { action: 'toggle-overlay' }).catch(() => {
+          // Content script not ready, ignore silently
+        });
+      }
+    } catch {
+      // Ignore errors silently
     }
   }
 });
@@ -237,8 +254,7 @@ async function getRecentlyClosedTabs(limit = 5) {
         favIconUrl: session.tab.favIconUrl || '',
         isRecentlyClosed: true
       }));
-  } catch (error) {
-    console.error('TabLight: Error getting recently closed tabs', error);
+  } catch {
     return [];
   }
 }
@@ -282,8 +298,7 @@ async function searchRecentlyClosed(query, limit = 5) {
       .slice(0, limit);
 
     return matches;
-  } catch (error) {
-    console.error('TabLight: Error searching recently closed tabs', error);
+  } catch {
     return [];
   }
 }
