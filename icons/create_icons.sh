@@ -1,0 +1,14 @@
+#!/bin/bash
+# Create simple placeholder icons using ImageMagick if available, or use base64
+# For now, create simple 1x1 colored PNGs that Chrome can use
+
+# 16x16 icon (base64 of a simple blue PNG)
+echo 'iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAANElEQVQ4T2NkYGD4z0ABYBw1gGE0DBhGwwDGkR4G/4H4PwMDgxEDAwOjAQPDf7qEwWggAABl7wgR6V5wNQAAAABJRU5ErkJggg==' | base64 -d > icon16.png
+
+# 48x48 icon
+echo 'iVBORw0KGgoAAAANSUhEUgAAADAAAAAwCAYAAABXAvmHAAAARUlEQVRoQ+3QQQ0AIAwAQbqP/xgIGgIPSMMm2LX3eN/v8wMAAABgCPiP7wMAAABoCNi3fQCY3gAAAAC8AngAAAAAACwBrwEgMACvnC/3AQAAAABJRU5ErkJggg==' | base64 -d > icon48.png
+
+# 128x128 icon  
+echo 'iVBORw0KGgoAAAANSUhEUgAAAIAAAACACAYAAADDPmHLAAAAT0lEQVR42u3BAQ0AAADCoPdPbQ8HFAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAB4GrXwAAFV3NM+AAAAAElFTkSuQmCC' | base64 -d > icon128.png
+
+echo "Icons created!"

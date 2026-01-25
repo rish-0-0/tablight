@@ -1,0 +1,246 @@
+// TabLight IndexedDB Module
+
+const DB_NAME = 'tablight';
+const DB_VERSION = 1;
+const TABS_STORE = 'tabs';
+
+let db = null;
+
+// Initialize the database
+export async function initDB() {
+  if (db) return db;
+
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+    request.onerror = () => reject(request.error);
+
+    request.onsuccess = () => {
+      db = request.result;
+      resolve(db);
+    };
+
+    request.onupgradeneeded = (event) => {
+      const database = event.target.result;
+
+      // Create tabs store
+      if (!database.objectStoreNames.contains(TABS_STORE)) {
+        const store = database.createObjectStore(TABS_STORE, { keyPath: 'id' });
+
+        // Create indexes for searching
+        store.createIndex('title', 'title', { unique: false });
+        store.createIndex('url', 'url', { unique: false });
+        store.createIndex('lastAccessed', 'lastAccessed', { unique: false });
+      }
+    };
+  });
+}
+
+// Add or update a tab in the index
+export async function upsertTab(tabData) {
+  const database = await initDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([TABS_STORE], 'readwrite');
+    const store = transaction.objectStore(TABS_STORE);
+
+    const data = {
+      id: tabData.id,
+      windowId: tabData.windowId,
+      title: tabData.title || '',
+      url: tabData.url || '',
+      favIconUrl: tabData.favIconUrl || '',
+      metaDescription: tabData.metaDescription || '',
+      metaKeywords: tabData.metaKeywords || '',
+      lastAccessed: tabData.lastAccessed || Date.now(),
+      // Combine all searchable text for easier searching
+      searchText: [
+        tabData.title || '',
+        tabData.url || '',
+        tabData.metaDescription || '',
+        tabData.metaKeywords || ''
+      ].join(' ').toLowerCase()
+    };
+
+    const request = store.put(data);
+    request.onsuccess = () => resolve(data);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Get a tab by ID
+export async function getTab(tabId) {
+  const database = await initDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([TABS_STORE], 'readonly');
+    const store = transaction.objectStore(TABS_STORE);
+    const request = store.get(tabId);
+
+    request.onsuccess = () => resolve(request.result || null);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Remove a tab from the index
+export async function removeTab(tabId) {
+  const database = await initDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([TABS_STORE], 'readwrite');
+    const store = transaction.objectStore(TABS_STORE);
+    const request = store.delete(tabId);
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Get all tabs
+export async function getAllTabs() {
+  const database = await initDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([TABS_STORE], 'readonly');
+    const store = transaction.objectStore(TABS_STORE);
+    const request = store.getAll();
+
+    request.onsuccess = () => resolve(request.result || []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Clear all tabs from the index
+export async function clearAllTabs() {
+  const database = await initDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = database.transaction([TABS_STORE], 'readwrite');
+    const store = transaction.objectStore(TABS_STORE);
+    const request = store.clear();
+
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
+// Search tabs with fuzzy matching
+export async function searchTabs(query, limit = 5) {
+  if (!query || query.trim() === '') {
+    return [];
+  }
+
+  const allTabs = await getAllTabs();
+  const normalizedQuery = query.toLowerCase().trim();
+  const queryTerms = normalizedQuery.split(/\s+/);
+
+  // Score each tab
+  const scored = allTabs.map(tab => {
+    const score = calculateScore(tab, queryTerms, normalizedQuery);
+    return { ...tab, score };
+  });
+
+  // Sort by score (highest first), then by lastAccessed (most recent first)
+  scored.sort((a, b) => {
+    if (b.score !== a.score) return b.score - a.score;
+    return b.lastAccessed - a.lastAccessed;
+  });
+
+  // Filter out zero scores and limit results
+  return scored.filter(tab => tab.score > 0).slice(0, limit);
+}
+
+// Calculate relevance score for a tab
+function calculateScore(tab, queryTerms, fullQuery) {
+  let score = 0;
+  const title = (tab.title || '').toLowerCase();
+  const url = (tab.url || '').toLowerCase();
+  const description = (tab.metaDescription || '').toLowerCase();
+  const keywords = (tab.metaKeywords || '').toLowerCase();
+
+  // Exact title match (highest score)
+  if (title === fullQuery) {
+    score += 100;
+  }
+  // Title starts with query
+  else if (title.startsWith(fullQuery)) {
+    score += 80;
+  }
+  // Title contains query
+  else if (title.includes(fullQuery)) {
+    score += 60;
+  }
+
+  // URL contains query
+  if (url.includes(fullQuery)) {
+    score += 40;
+  }
+
+  // Check each query term
+  for (const term of queryTerms) {
+    if (term.length < 2) continue;
+
+    // Term matches in title
+    if (title.includes(term)) {
+      score += 20;
+    }
+
+    // Term matches in URL
+    if (url.includes(term)) {
+      score += 15;
+    }
+
+    // Term matches in description
+    if (description.includes(term)) {
+      score += 10;
+    }
+
+    // Term matches in keywords
+    if (keywords.includes(term)) {
+      score += 10;
+    }
+
+    // Fuzzy matching - check for partial matches
+    const fuzzyScore = fuzzyMatch(term, title);
+    if (fuzzyScore > 0.6) {
+      score += Math.floor(fuzzyScore * 15);
+    }
+  }
+
+  return score;
+}
+
+// Simple fuzzy matching (returns 0-1 score)
+function fuzzyMatch(needle, haystack) {
+  if (needle.length === 0) return 0;
+  if (haystack.length === 0) return 0;
+  if (needle === haystack) return 1;
+  if (haystack.includes(needle)) return 0.9;
+
+  let needleIdx = 0;
+  let matches = 0;
+
+  for (let i = 0; i < haystack.length && needleIdx < needle.length; i++) {
+    if (haystack[i] === needle[needleIdx]) {
+      matches++;
+      needleIdx++;
+    }
+  }
+
+  // If we didn't match all characters, return partial score
+  if (needleIdx < needle.length) {
+    return matches / needle.length * 0.5;
+  }
+
+  return matches / needle.length;
+}
+
+// Get tabs sorted by last accessed (for recent tabs list)
+export async function getRecentTabs(excludeTabId = null, limit = 10) {
+  const allTabs = await getAllTabs();
+
+  return allTabs
+    .filter(tab => tab.id !== excludeTabId)
+    .sort((a, b) => b.lastAccessed - a.lastAccessed)
+    .slice(0, limit);
+}
