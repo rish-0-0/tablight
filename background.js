@@ -341,6 +341,19 @@ chrome.commands.onCommand.addListener(async (command) => {
     } catch {
       // Ignore errors silently
     }
+  } else if (command === 'switch-to-mru-tab') {
+    try {
+      // MRU tab is the second-to-last in the activity order
+      // (last is current tab, second-to-last is most recently used)
+      if (tabActivityOrder.length >= 2) {
+        const mruTabId = tabActivityOrder[tabActivityOrder.length - 2];
+        const tab = await chrome.tabs.get(mruTabId);
+        await chrome.tabs.update(mruTabId, { active: true });
+        await chrome.windows.update(tab.windowId, { focused: true });
+      }
+    } catch {
+      // Tab might not exist anymore, ignore silently
+    }
   }
 });
 

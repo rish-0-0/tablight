@@ -7,10 +7,13 @@ document.addEventListener('DOMContentLoaded', async () => {
   const shortcutEl = document.getElementById('shortcut');
   shortcutEl.textContent = isMac ? '⌘ + Shift + K' : 'Ctrl + Shift + K';
 
-  // Settings button handler
+  // Settings button handler - opens sidepanel
   const settingsBtn = document.getElementById('settings-btn');
-  settingsBtn.addEventListener('click', () => {
-    // TODO: Open Chrome sidepanel with settings
-    console.log('Settings clicked - sidepanel integration pending');
+  settingsBtn.addEventListener('click', async () => {
+    // Get current window to open sidepanel in
+    const currentWindow = await chrome.windows.getCurrent();
+    await chrome.sidePanel.open({ windowId: currentWindow.id });
+    // Close popup after opening sidepanel
+    window.close();
   });
 });
