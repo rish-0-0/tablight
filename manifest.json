@@ -1,12 +1,13 @@
 {
   "manifest_version": 3,
   "name": "TabLight",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Spotlight for Chrome - quickly switch between tabs",
   "permissions": [
     "tabs",
     "activeTab",
-    "sessions"
+    "sessions",
+    "bookmarks"
   ],
   "background": {
     "service_worker": "background.js",
