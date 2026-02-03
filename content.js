@@ -7,7 +7,7 @@
   let hostElement = null;
   let shadowRoot = null;
   let isVisible = false;
-  let results = { tabs: [], recentlyClosed: [] };
+  let results = { tabs: [], bookmarks: [], quickAccess: [], recentlyClosed: [] };
   let selectedIndex = 0;
   let currentQuery = '';
   let autocompleteText = '';
@@ -115,6 +115,10 @@
       letter-spacing: -0.02em;
       position: relative;
       z-index: 2;
+      padding: 0;
+      margin: 0;
+      line-height: 1.2;
+      height: 24px;
     }
 
     .tablight-input::placeholder {
@@ -134,7 +138,8 @@
       white-space: pre;
       overflow: hidden;
       z-index: 1;
-      line-height: normal;
+      line-height: 1.2;
+      height: 24px;
     }
 
     .tablight-results {
@@ -144,16 +149,21 @@
     }
 
     .tablight-results::-webkit-scrollbar {
-      width: 8px;
+      width: 6px;
     }
 
     .tablight-results::-webkit-scrollbar-track {
       background: transparent;
+      margin: 4px 0;
     }
 
     .tablight-results::-webkit-scrollbar-thumb {
-      background: rgba(255, 255, 255, 0.2);
-      border-radius: 4px;
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    .tablight-results::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.25);
     }
 
     .tablight-section-label {
@@ -372,6 +382,8 @@
       if (response) {
         results = {
           tabs: response.tabs || [],
+          bookmarks: response.bookmarks || [],
+          quickAccess: response.quickAccess || [],
           recentlyClosed: response.recentlyClosed || []
         };
         selectedIndex = 0;
@@ -386,7 +398,7 @@
     const autocompleteEl = shadowRoot.querySelector('.tablight-autocomplete');
     if (!autocompleteEl) return;
 
-    const allResults = [...results.tabs, ...results.recentlyClosed];
+    const allResults = getAllResults();
 
     if (currentQuery && allResults.length > 0) {
       const bestMatch = allResults[0];
@@ -431,6 +443,8 @@
       return;
     }
 
+    let currentIndex = 0;
+
     // Open tabs section
     if (results.tabs.length > 0) {
       const label = document.createElement('div');
@@ -438,8 +452,32 @@
       label.textContent = 'Open Tabs';
       resultsContainer.appendChild(label);
 
-      results.tabs.forEach((tab, index) => {
-        resultsContainer.appendChild(createResultItem(tab, index, false));
+      results.tabs.forEach((tab) => {
+        resultsContainer.appendChild(createResultItem(tab, currentIndex++, 'tab'));
+      });
+    }
+
+    // Bookmarks section
+    if (results.bookmarks.length > 0) {
+      const label = document.createElement('div');
+      label.className = 'tablight-section-label';
+      label.textContent = 'Bookmarks';
+      resultsContainer.appendChild(label);
+
+      results.bookmarks.forEach((bookmark) => {
+        resultsContainer.appendChild(createResultItem(bookmark, currentIndex++, 'bookmark'));
+      });
+    }
+
+    // Chrome Quick Access section (only shows when searching)
+    if (results.quickAccess.length > 0) {
+      const label = document.createElement('div');
+      label.className = 'tablight-section-label';
+      label.textContent = 'Chrome';
+      resultsContainer.appendChild(label);
+
+      results.quickAccess.forEach((page) => {
+        resultsContainer.appendChild(createResultItem(page, currentIndex++, 'quickAccess'));
       });
     }
 
@@ -450,29 +488,30 @@
       label.textContent = 'Recently Closed';
       resultsContainer.appendChild(label);
 
-      results.recentlyClosed.forEach((tab, index) => {
-        resultsContainer.appendChild(createResultItem(tab, results.tabs.length + index, true));
+      results.recentlyClosed.forEach((tab) => {
+        resultsContainer.appendChild(createResultItem(tab, currentIndex++, 'recentlyClosed'));
       });
     }
   }
 
   // Create a result item element
-  function createResultItem(tab, index, isRecentlyClosed) {
+  function createResultItem(item, index, type) {
     const isSelected = index === selectedIndex;
 
-    const item = document.createElement('div');
-    item.className = 'tablight-result-item' + (isSelected ? ' selected' : '');
-    item.dataset.index = index;
+    const itemEl = document.createElement('div');
+    itemEl.className = 'tablight-result-item' + (isSelected ? ' selected' : '');
+    itemEl.dataset.index = index;
+    itemEl.dataset.type = type;
 
     // Favicon
     const favicon = document.createElement('img');
     favicon.className = 'tablight-favicon';
-    favicon.src = tab.favIconUrl || DEFAULT_FAVICON;
+    favicon.src = item.favIconUrl || DEFAULT_FAVICON;
     favicon.alt = '';
     favicon.onerror = function() {
       this.src = DEFAULT_FAVICON;
     };
-    item.appendChild(favicon);
+    itemEl.appendChild(favicon);
 
     // Content
     const content = document.createElement('div');
@@ -480,22 +519,32 @@
 
     const title = document.createElement('div');
     title.className = 'tablight-result-title';
-    title.innerHTML = highlightMatch(tab.title || 'Untitled', currentQuery);
+    title.innerHTML = highlightMatch(item.title || 'Untitled', currentQuery);
     content.appendChild(title);
 
     const url = document.createElement('div');
     url.className = 'tablight-result-url';
-    url.textContent = truncateUrl(tab.url || '');
+    url.textContent = truncateUrl(item.url || '');
     content.appendChild(url);
 
-    item.appendChild(content);
+    itemEl.appendChild(content);
 
-    // Badge for recently closed
-    if (isRecentlyClosed) {
+    // Badge based on type
+    if (type === 'recentlyClosed') {
       const badge = document.createElement('span');
       badge.className = 'tablight-result-badge';
       badge.textContent = 'Closed';
-      item.appendChild(badge);
+      itemEl.appendChild(badge);
+    } else if (type === 'bookmark') {
+      const badge = document.createElement('span');
+      badge.className = 'tablight-result-badge';
+      badge.textContent = 'Bookmark';
+      itemEl.appendChild(badge);
+    } else if (type === 'quickAccess') {
+      const badge = document.createElement('span');
+      badge.className = 'tablight-result-badge';
+      badge.textContent = 'Chrome';
+      itemEl.appendChild(badge);
     }
 
     // Shortcut indicator for selected item
@@ -503,18 +552,23 @@
       const shortcut = document.createElement('span');
       shortcut.className = 'tablight-shortcut';
       shortcut.textContent = '↵';
-      item.appendChild(shortcut);
+      itemEl.appendChild(shortcut);
     }
 
     // Click handler
-    item.addEventListener('click', () => selectItem(index));
+    itemEl.addEventListener('click', () => selectItem(index));
 
-    return item;
+    return itemEl;
   }
 
   // Get all results as a flat array
   function getAllResults() {
-    return [...results.tabs, ...results.recentlyClosed];
+    return [
+      ...results.tabs,
+      ...results.bookmarks,
+      ...results.quickAccess,
+      ...results.recentlyClosed
+    ];
   }
 
   // Highlight matching text
@@ -542,13 +596,31 @@
     if (!item) return;
 
     if (item.isRecentlyClosed) {
+      // Restore recently closed tab
       safeSendMessage({
         action: 'restore-session',
         sessionId: item.sessionId
       }, () => {
         hideOverlay();
       });
+    } else if (item.isBookmark) {
+      // Open bookmark in new tab
+      safeSendMessage({
+        action: 'open-bookmark',
+        url: item.url
+      }, () => {
+        hideOverlay();
+      });
+    } else if (item.isQuickAccess) {
+      // Open Chrome quick access page in new tab
+      safeSendMessage({
+        action: 'open-quick-access',
+        url: item.url
+      }, () => {
+        hideOverlay();
+      });
     } else {
+      // Switch to open tab
       safeSendMessage({
         action: 'switch-to-tab',
         tabId: item.id,
@@ -582,7 +654,7 @@
     selectedIndex = 0;
     currentQuery = '';
     autocompleteText = '';
-    results = { tabs: [], recentlyClosed: [] };
+    results = { tabs: [], bookmarks: [], quickAccess: [], recentlyClosed: [] };
 
     // Clear any pending search
     if (searchTimeout) {

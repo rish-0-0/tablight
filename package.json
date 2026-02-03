@@ -1,6 +1,6 @@
 {
   "name": "tablight",
-  "version": "0.0.0",
+  "version": "0.1.1",
   "description": "It's a tab searcher for chrome tabs: like a spotlight for chrome",
   "main": "index.js",
   "scripts": {
