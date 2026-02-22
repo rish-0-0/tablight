@@ -13,14 +13,15 @@
       background: #fffef8;
       font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', sans-serif;
       color: #1d1d1f;
-      padding: 24px;
+      padding: 20px;
     }
 
+    /* Header */
     .header {
       display: flex;
       align-items: center;
       gap: 12px;
-      margin-bottom: 32px;
+      margin-bottom: 20px;
       padding-bottom: 16px;
       border-bottom: 1px solid rgba(0, 0, 0, 0.08);
     }
@@ -35,6 +36,229 @@
       font-weight: 600;
     }
 
+    /* Tabs - Apple-style segmented control */
+    .tabs {
+      display: flex;
+      background: #f5f5f7;
+      border-radius: 8px;
+      padding: 3px;
+      margin-bottom: 20px;
+    }
+
+    .tab-button {
+      flex: 1;
+      padding: 8px 16px;
+      border: none;
+      background: transparent;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #86868b;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-family: inherit;
+    }
+
+    .tab-button.active {
+      background: #ffffff;
+      color: #1d1d1f;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    }
+
+    .tab-button:hover:not(.active) {
+      color: #1d1d1f;
+    }
+
+    /* Tab content */
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* Search Tab Styles */
+    .search-container {
+      position: relative;
+      margin-bottom: 16px;
+    }
+
+    .search-icon {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 16px;
+      height: 16px;
+      color: #86868b;
+      pointer-events: none;
+    }
+
+    .search-input-wrapper {
+      position: relative;
+    }
+
+    .search-input {
+      width: 100%;
+      padding: 10px 14px 10px 36px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+      border-radius: 8px;
+      font-size: 14px;
+      font-family: inherit;
+      background: #ffffff;
+      color: #1d1d1f;
+      transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .search-input:focus {
+      outline: none;
+      border-color: #007AFF;
+      box-shadow: 0 0 0 3px rgba(0, 122, 255, 0.15);
+    }
+
+    .search-input::placeholder {
+      color: #86868b;
+    }
+
+    .search-autocomplete {
+      position: absolute;
+      top: 0;
+      left: 36px;
+      right: 14px;
+      padding: 10px 0;
+      font-size: 14px;
+      color: #86868b;
+      pointer-events: none;
+      white-space: nowrap;
+      overflow: hidden;
+      line-height: 1.5;
+    }
+
+    /* Results */
+    .results-container {
+      max-height: calc(100vh - 220px);
+      overflow-y: auto;
+    }
+
+    .results-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .results-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .results-container::-webkit-scrollbar-thumb {
+      background: rgba(0, 0, 0, 0.15);
+      border-radius: 3px;
+    }
+
+    .results-container::-webkit-scrollbar-thumb:hover {
+      background: rgba(0, 0, 0, 0.25);
+    }
+
+    .results-section-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #86868b;
+      padding: 12px 12px 6px;
+    }
+
+    .results-section-label:first-child {
+      padding-top: 0;
+    }
+
+    .result-item {
+      display: flex;
+      align-items: center;
+      padding: 10px 12px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s ease;
+    }
+
+    .result-item:hover {
+      background: rgba(0, 0, 0, 0.04);
+    }
+
+    .result-item.selected {
+      background: rgba(0, 122, 255, 0.12);
+    }
+
+    .result-favicon {
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      margin-right: 12px;
+      background: #f5f5f7;
+      flex-shrink: 0;
+      object-fit: cover;
+    }
+
+    .result-content {
+      flex: 1;
+      min-width: 0;
+      overflow: hidden;
+    }
+
+    .result-title {
+      font-size: 13px;
+      font-weight: 500;
+      color: #1d1d1f;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      margin-bottom: 2px;
+    }
+
+    .result-url {
+      font-size: 11px;
+      color: #86868b;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .result-badge {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.02em;
+      color: #86868b;
+      background: #f5f5f7;
+      padding: 3px 6px;
+      border-radius: 4px;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    .result-shortcut {
+      font-size: 12px;
+      color: #86868b;
+      background: #f5f5f7;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    .results-empty {
+      text-align: center;
+      padding: 32px 16px;
+      color: #86868b;
+      font-size: 13px;
+    }
+
+    .highlight {
+      background: rgba(0, 122, 255, 0.2);
+      border-radius: 2px;
+      padding: 0 2px;
+    }
+
+    /* Settings Tab Styles */
     .section {
       margin-bottom: 24px;
     }
@@ -95,23 +319,53 @@
 <body>
   <div class="header">
     <img src="icons/icon48.png" alt="TabLight" class="header-icon">
-    <div class="header-title">TabLight Settings</div>
+    <div class="header-title">TabLight</div>
   </div>
 
-  <div class="section">
-    <div class="section-title">Keyboard Shortcuts</div>
+  <div class="tabs">
+    <button class="tab-button active" data-tab="search">Search</button>
+    <button class="tab-button" data-tab="settings">Settings</button>
+  </div>
 
-    <div class="shortcut-row">
-      <span class="shortcut-label">Open TabLight</span>
-      <div class="shortcut-keys" id="open-shortcut"></div>
+  <!-- Search Tab -->
+  <div class="tab-content active" id="search-tab">
+    <div class="search-container">
+      <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="11" cy="11" r="8"></circle>
+        <path d="M21 21l-4.35-4.35"></path>
+      </svg>
+      <div class="search-input-wrapper">
+        <div class="search-autocomplete" id="search-autocomplete"></div>
+        <input
+          type="text"
+          class="search-input"
+          id="search-input"
+          placeholder="Search tabs, bookmarks..."
+          autocomplete="off"
+          spellcheck="false"
+        />
+      </div>
     </div>
+    <div class="results-container" id="results-container"></div>
+  </div>
 
-    <div class="shortcut-row">
-      <span class="shortcut-label">Switch to MRU Tab</span>
-      <div class="shortcut-keys" id="mru-shortcut"></div>
+  <!-- Settings Tab -->
+  <div class="tab-content" id="settings-tab">
+    <div class="section">
+      <div class="section-title">Keyboard Shortcuts</div>
+
+      <div class="shortcut-row">
+        <span class="shortcut-label">Open TabLight</span>
+        <div class="shortcut-keys" id="open-shortcut"></div>
+      </div>
+
+      <div class="shortcut-row">
+        <span class="shortcut-label">Switch to MRU Tab</span>
+        <div class="shortcut-keys" id="mru-shortcut"></div>
+      </div>
     </div>
   </div>
 
-  <script src="sidepanel.js"></script>
+  <script src="sidepanel.js" type="module"></script>
 </body>
 </html>
