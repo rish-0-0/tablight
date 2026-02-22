@@ -6,7 +6,14 @@ import {
   getAllTabs,
   clearAllTabs,
   searchTabs,
-  getRecentTabs
+  getRecentTabs,
+  upsertBookmarkUsage,
+  getBookmarkUsage,
+  getAllBookmarkUsage,
+  removeBookmarkUsage,
+  addRecentlyAccessed,
+  getRecentlyAccessed,
+  removeRecentlyAccessed
 } from './db.js';
 
 // Track tab activity order in memory (most recent at the end)
@@ -88,19 +95,46 @@ async function fetchAllBookmarks() {
   }
 }
 
+// Enrich bookmarks with usage data
+async function enrichBookmarksWithUsageData(bookmarks) {
+  try {
+    const usageData = await getAllBookmarkUsage();
+    const usageMap = new Map(usageData.map(u => [u.id, u]));
+
+    return bookmarks.map(bookmark => ({
+      ...bookmark,
+      lastAccessed: usageMap.get(bookmark.id)?.lastAccessed || 0,
+      accessCount: usageMap.get(bookmark.id)?.accessCount || 0
+    }));
+  } catch (error) {
+    console.error('Failed to enrich bookmarks:', error);
+    return bookmarks;
+  }
+}
+
 // Search bookmarks with scoring
-function searchBookmarks(query, limit = 5) {
+async function searchBookmarks(query, limit = 5) {
+  // Enrich bookmarks with usage data first
+  const enrichedBookmarks = await enrichBookmarksWithUsageData(cachedBookmarks);
+
   if (!query || !query.trim()) {
-    // Return most recently added for default view
-    return [...cachedBookmarks]
-      .sort((a, b) => (b.dateAdded || 0) - (a.dateAdded || 0))
+    // Return most recently USED for default view
+    return enrichedBookmarks
+      .sort((a, b) => {
+        // Primary sort: by lastAccessed (most recent first)
+        // Secondary sort: by dateAdded for never-accessed bookmarks
+        if (b.lastAccessed !== a.lastAccessed) {
+          return b.lastAccessed - a.lastAccessed;
+        }
+        return (b.dateAdded || 0) - (a.dateAdded || 0);
+      })
       .slice(0, limit);
   }
 
   const normalizedQuery = query.toLowerCase().trim();
   const queryTerms = normalizedQuery.split(/\s+/);
 
-  const scored = cachedBookmarks.map(bookmark => {
+  const scored = enrichedBookmarks.map(bookmark => {
     const title = (bookmark.title || '').toLowerCase();
     const url = (bookmark.url || '').toLowerCase();
     let score = 0;
@@ -127,6 +161,44 @@ function searchBookmarks(query, limit = 5) {
     .filter(b => b.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, limit);
+}
+
+// Check if tab URL matches a bookmark and track usage
+async function trackBookmarkIfMatches(tab) {
+  if (!tab || !tab.url) return;
+
+  // Skip chrome:// and extension URLs
+  if (tab.url.startsWith('chrome://') ||
+      tab.url.startsWith('chrome-extension://') ||
+      tab.url.startsWith('about:')) {
+    return;
+  }
+
+  try {
+    // Find matching bookmark by URL
+    const matchingBookmark = cachedBookmarks.find(bookmark => {
+      // Exact URL match
+      if (bookmark.url === tab.url) return true;
+
+      // URL match ignoring trailing slash
+      const bookmarkUrl = bookmark.url.replace(/\/$/, '');
+      const tabUrl = tab.url.replace(/\/$/, '');
+      return bookmarkUrl === tabUrl;
+    });
+
+    if (matchingBookmark) {
+      // Update bookmark usage
+      const existing = await getBookmarkUsage(matchingBookmark.id);
+      await upsertBookmarkUsage({
+        id: matchingBookmark.id,
+        url: matchingBookmark.url,
+        lastAccessed: Date.now(),
+        accessCount: (existing?.accessCount || 0) + 1
+      });
+    }
+  } catch (error) {
+    console.error('Failed to track bookmark match:', error);
+  }
 }
 
 // Search Chrome quick access pages
@@ -186,6 +258,9 @@ async function initialize() {
   try {
     await initDB();
 
+    // Enable side panel to open when clicking the extension icon
+    await chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+
     // Clear stale data and rebuild index from current tabs
     await clearAllTabs();
 
@@ -214,15 +289,32 @@ async function initialize() {
       }
     });
 
-    chrome.bookmarks.onRemoved.addListener((id) => {
+    chrome.bookmarks.onRemoved.addListener(async (id) => {
       cachedBookmarks = cachedBookmarks.filter(b => b.id !== id);
+      // Clean up usage data
+      try {
+        await removeBookmarkUsage(id);
+      } catch (error) {
+        console.error('Failed to remove bookmark usage:', error);
+      }
     });
 
-    chrome.bookmarks.onChanged.addListener((id, changeInfo) => {
+    chrome.bookmarks.onChanged.addListener(async (id, changeInfo) => {
       const bookmark = cachedBookmarks.find(b => b.id === id);
       if (bookmark) {
         if (changeInfo.title !== undefined) bookmark.title = changeInfo.title;
-        if (changeInfo.url !== undefined) bookmark.url = changeInfo.url;
+        if (changeInfo.url !== undefined) {
+          bookmark.url = changeInfo.url;
+          // Update URL in usage data
+          try {
+            const usage = await getBookmarkUsage(id);
+            if (usage) {
+              await upsertBookmarkUsage({ ...usage, url: changeInfo.url });
+            }
+          } catch (error) {
+            console.error('Failed to update bookmark usage URL:', error);
+          }
+        }
       }
     });
 
@@ -293,6 +385,8 @@ chrome.tabs.onCreated.addListener(async (tab) => {
     tabActivityOrder.push(tab.id);
   }
   await indexTab(tab);
+  // Check if this tab matches any bookmark
+  await trackBookmarkIfMatches(tab);
 });
 
 // Tab updated (URL change, title change, etc.)
@@ -302,6 +396,8 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo, tab) => {
     await indexTab(tab);
     // Request meta tags after page loads
     setTimeout(() => requestMetaTags(tabId), 500);
+    // Check if this tab matches any bookmark
+    await trackBookmarkIfMatches(tab);
   }
 });
 
@@ -326,6 +422,12 @@ chrome.tabs.onActivated.addListener(async (activeInfo) => {
 chrome.tabs.onRemoved.addListener(async (tabId) => {
   tabActivityOrder = tabActivityOrder.filter(id => id !== tabId);
   await removeTab(tabId);
+  // Clean up recently accessed data
+  try {
+    await removeRecentlyAccessed(tabId);
+  } catch (error) {
+    console.error('Failed to remove recently accessed tab:', error);
+  }
 });
 
 // Handle keyboard command
@@ -334,12 +436,16 @@ chrome.commands.onCommand.addListener(async (command) => {
     try {
       const [activeTab] = await chrome.tabs.query({ active: true, currentWindow: true });
       if (activeTab && canMessageTab(activeTab)) {
+        // Regular page - toggle the overlay
         await chrome.tabs.sendMessage(activeTab.id, { action: 'toggle-overlay' }).catch(() => {
-          // Content script not ready, ignore silently
+          // Content script not ready - silently ignore
+          // User can click the extension icon to open side panel
         });
       }
-    } catch {
-      // Ignore errors silently
+      // On restricted pages (chrome://, etc.), keyboard shortcut can't open side panel
+      // due to Chrome API limitations. User must click the extension icon instead.
+    } catch (error) {
+      console.error('TabLight toggle error:', error);
     }
   } else if (command === 'switch-to-mru-tab') {
     try {
@@ -374,8 +480,9 @@ async function handleMessage(request, sender) {
         const recentTabs = await getRecentTabs(currentTabId, 5);
         return {
           tabs: recentTabs,
-          bookmarks: searchBookmarks('', 5),
+          bookmarks: await searchBookmarks('', 5),
           quickAccess: [],
+          recentlyAccessed: await getRecentlyAccessed(10),
           recentlyClosed: await getRecentlyClosedTabs(5)
         };
       }
@@ -387,7 +494,7 @@ async function handleMessage(request, sender) {
       const filteredResults = searchResults.filter(tab => tab.id !== currentTabId);
 
       // Search bookmarks
-      const bookmarkResults = searchBookmarks(query, 5);
+      const bookmarkResults = await searchBookmarks(query, 5);
 
       // Search Chrome quick access pages
       const quickAccessResults = searchQuickAccess(query);
@@ -399,6 +506,7 @@ async function handleMessage(request, sender) {
         tabs: filteredResults,
         bookmarks: bookmarkResults,
         quickAccess: quickAccessResults,
+        recentlyAccessed: [], // Empty during search
         recentlyClosed
       };
     }
@@ -410,7 +518,8 @@ async function handleMessage(request, sender) {
 
       return {
         tabs: recentTabs,
-        bookmarks: searchBookmarks('', 5),
+        bookmarks: await searchBookmarks('', 5),
+        recentlyAccessed: await getRecentlyAccessed(10),
         recentlyClosed
       };
     }
@@ -418,6 +527,22 @@ async function handleMessage(request, sender) {
     case 'switch-to-tab': {
       await chrome.tabs.update(request.tabId, { active: true });
       await chrome.windows.update(request.windowId, { focused: true });
+
+      // Track this tab access in Recently Accessed
+      try {
+        const tab = await chrome.tabs.get(request.tabId);
+        await addRecentlyAccessed({
+          id: tab.id,
+          windowId: tab.windowId,
+          title: tab.title || '',
+          url: tab.url || '',
+          favIconUrl: tab.favIconUrl || '',
+          accessedAt: Date.now()
+        });
+      } catch (error) {
+        console.error('Failed to track recently accessed tab:', error);
+      }
+
       return { success: true };
     }
 
@@ -429,7 +554,33 @@ async function handleMessage(request, sender) {
 
     case 'open-bookmark': {
       // Open bookmark URL in a new tab
-      await chrome.tabs.create({ url: request.url });
+      const newTab = await chrome.tabs.create({ url: request.url });
+
+      // Track bookmark access
+      try {
+        if (request.bookmarkId) {
+          const existing = await getBookmarkUsage(request.bookmarkId);
+          await upsertBookmarkUsage({
+            id: request.bookmarkId,
+            url: request.url,
+            lastAccessed: Date.now(),
+            accessCount: (existing?.accessCount || 0) + 1
+          });
+        }
+
+        // Also track in Recently Accessed
+        await addRecentlyAccessed({
+          id: newTab.id,
+          windowId: newTab.windowId,
+          title: request.url, // Will be updated when tab loads
+          url: request.url,
+          favIconUrl: '',
+          accessedAt: Date.now()
+        });
+      } catch (error) {
+        console.error('Failed to track bookmark access:', error);
+      }
+
       return { success: true };
     }
 

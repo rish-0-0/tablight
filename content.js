@@ -7,7 +7,7 @@
   let hostElement = null;
   let shadowRoot = null;
   let isVisible = false;
-  let results = { tabs: [], bookmarks: [], quickAccess: [], recentlyClosed: [] };
+  let results = { tabs: [], bookmarks: [], quickAccess: [], recentlyAccessed: [], recentlyClosed: [] };
   let selectedIndex = 0;
   let currentQuery = '';
   let autocompleteText = '';
@@ -384,6 +384,7 @@
           tabs: response.tabs || [],
           bookmarks: response.bookmarks || [],
           quickAccess: response.quickAccess || [],
+          recentlyAccessed: response.recentlyAccessed || [],
           recentlyClosed: response.recentlyClosed || []
         };
         selectedIndex = 0;
@@ -481,6 +482,18 @@
       });
     }
 
+    // Recently Accessed section (only shows when NOT searching)
+    if (results.recentlyAccessed.length > 0) {
+      const label = document.createElement('div');
+      label.className = 'tablight-section-label';
+      label.textContent = 'Recently Accessed';
+      resultsContainer.appendChild(label);
+
+      results.recentlyAccessed.forEach((tab) => {
+        resultsContainer.appendChild(createResultItem(tab, currentIndex++, 'recentlyAccessed'));
+      });
+    }
+
     // Recently closed section
     if (results.recentlyClosed.length > 0) {
       const label = document.createElement('div');
@@ -567,6 +580,7 @@
       ...results.tabs,
       ...results.bookmarks,
       ...results.quickAccess,
+      ...results.recentlyAccessed,
       ...results.recentlyClosed
     ];
   }
@@ -607,6 +621,7 @@
       // Open bookmark in new tab
       safeSendMessage({
         action: 'open-bookmark',
+        bookmarkId: item.id,
         url: item.url
       }, () => {
         hideOverlay();
@@ -654,7 +669,7 @@
     selectedIndex = 0;
     currentQuery = '';
     autocompleteText = '';
-    results = { tabs: [], bookmarks: [], quickAccess: [], recentlyClosed: [] };
+    results = { tabs: [], bookmarks: [], quickAccess: [], recentlyAccessed: [], recentlyClosed: [] };
 
     // Clear any pending search
     if (searchTimeout) {
